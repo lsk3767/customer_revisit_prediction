@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>환자 이탈 분석</title>
+
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    h2 { margin-bottom: 20px; }
+
+    .summary { margin-bottom: 20px; font-size: 16px; }
+    .summary span { margin-right: 20px; font-weight: bold; }
+
+    table { border-collapse: collapse; width: 100%; }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th { background-color: #f2f2f2; }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .HIGH { background-color: #ff4d4f; }
+    .MID { background-color: #faad14; }
+    .LOW { background-color: #52c41a; }
+
+    .filter-btn {
+      margin-right: 10px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>환자 이탈 분석</h2>
+
+<button onclick="runAI()" style="margin-bottom:20px; padding:10px; font-weight:bold;">
+  AI 예측 실행
+</button>
+<span id="status" style="margin-left:20px; font-weight:bold;"></span>
+
+<div class="summary">
+  <span>🔴 HIGH: <span id="high"></span></span>
+  <span>🟠 MID: <span id="mid"></span></span>
+  <span>🟢 LOW: <span id="low"></span></span>
+</div>
+
+<div>
+  <button class="filter-btn" onclick="setFilter('ALL')">전체</button>
+  <button class="filter-btn" onclick="setFilter('HIGH')">HIGH</button>
+  <button class="filter-btn" onclick="setFilter('MID')">MID</button>
+  <button class="filter-btn" onclick="setFilter('LOW')">LOW</button>
+</div>
+
+<br>
+
+<table>
+  <thead>
+    <tr>
+      <th>이름</th>
+      <th>고객번호</th>
+      <th>방문수</th>
+      <th>재방문율(과거)</th>
+      <th>AI 예측 확률</th>
+      <th>마지막 방문</th>
+      <th>경과일</th>
+      <th>위험</th>
+    </tr>
+  </thead>
+  <tbody id="table-body"></tbody>
+</table>
+
+<!-- 🔥 페이지네이션 -->
+<div style="margin-top:20px;">
+  <button onclick="prevPage()">이전</button>
+  <span id="page-info"></span>
+  <button onclick="nextPage()">다음</button>
+</div>
+
+<script>
+let originalData = []
+let isAIExecuted = false
+
+// 🔥 페이지 관련
+let currentPage = 1
+const pageSize = 50
+let currentFilter = 'ALL'
+
+// 데이터 불러오기
+function loadData() {
+  fetch('http://localhost:3000/patient-risk')
+    .then(res => res.json())
+    .then(data => {
+
+      if (!isAIExecuted) {
+        data.forEach(d => {
+          d.revisit_prob = null
+          d.risk_level = null
+        })
+      }
+
+      originalData = data
+
+      const high = data.filter(d => d.risk_level === 'HIGH').length
+      const mid = data.filter(d => d.risk_level === 'MID').length
+      const low = data.filter(d => d.risk_level === 'LOW').length
+
+      document.getElementById('high').innerText = high
+      document.getElementById('mid').innerText = mid
+      document.getElementById('low').innerText = low
+
+      renderTable()
+    })
+}
+
+// AI 실행
+function runAI() {
+  const status = document.getElementById('status')
+  status.innerText = '⏳ AI 실행 중...'
+
+  fetch('http://localhost:3000/run-ai')
+    .then(res => res.text())
+    .then(msg => {
+      status.innerText = '완료'
+      isAIExecuted = true
+      currentPage = 1
+      loadData()
+    })
+    .catch(err => {
+      console.error(err)
+      status.innerText = '❌ 오류 발생'
+    })
+}
+
+// 필터 변경
+function setFilter(filter) {
+  currentFilter = filter
+  currentPage = 1
+  renderTable()
+}
+
+// 테이블 렌더링 (🔥 핵심)
+function renderTable() {
+  const tbody = document.getElementById('table-body')
+  tbody.innerHTML = ''
+
+  let data = originalData
+
+  if (currentFilter !== 'ALL') {
+    data = data.filter(d => d.risk_level === currentFilter)
+  }
+
+  // 🔥 페이지 적용
+  const start = (currentPage - 1) * pageSize
+  const pagedData = data.slice(start, start + pageSize)
+
+  pagedData.forEach(row => {
+    const tr = document.createElement('tr')
+
+    tr.innerHTML = `
+      <td>${row.name || ''}</td>
+      <td>${row.CUST_NO}</td>
+      <td>${row.visit_count}</td>
+      <td>${(row.revisit_rate * 100).toFixed(1)}%</td>
+      <td>${row.revisit_prob ? `<b>${(row.revisit_prob * 100).toFixed(1)}%</b>` : '-'}</td>
+      <td>${row.last_visit_day || ''}</td>
+      <td>${row.days_since_last_visit}</td>
+      <td>${row.revisit_prob ? `<span class="badge ${row.risk_level}">${row.risk_level}</span>` : '-'}</td>
+    `
+
+    tbody.appendChild(tr)
+  })
+
+  // 페이지 표시
+  document.getElementById('page-info').innerText =
+    `${currentPage} / ${Math.ceil(data.length / pageSize)}`
+}
+
+// 페이지 이동
+function nextPage() {
+  currentPage++
+  renderTable()
+}
+
+function prevPage() {
+  if (currentPage > 1) currentPage--
+  renderTable()
+}
+
+// 최초 실행
+loadData()
+</script>
+
+</body>
+</html>

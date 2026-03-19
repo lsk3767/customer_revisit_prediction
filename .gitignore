@@ -1,0 +1,19 @@
+# python
+__pycache__/
+*.pyc
+
+# model
+*.pkl
+
+# data
+data/
+
+# env
+.env
+venv/
+
+# node
+node_modules/
+
+# OS
+.DS_Store
