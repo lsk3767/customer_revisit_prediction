@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>환자 분석</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body style="font-family:Arial; padding:20px; background:#f5f7fa;">
+
+<div style="
+  max-width:900px;
+  margin:auto;
+  background:white;
+  padding:25px;
+  border-radius:12px;
+  box-shadow:0 8px 20px rgba(0,0,0,0.1);
+">
+
+<h2>📊 환자 분석</h2>
+
+<div id="info" style="margin-bottom:20px;"></div>
+
+<canvas id="barChart" height="100"></canvas> <br> <canvas id="lineChart" height="100"></canvas>
+
+<!--(등급 설명 박스) -->
+
+<div id="tier-legend" style="
+  margin-top:20px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+"></div>
+
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search)
+const custNo = params.get('cust_no')
+
+fetch(`/highvalue-detail/${custNo}`)
+  .then(res => res.json())
+  .then(data => render(data))
+
+function render(data){
+  const s = data.summary
+
+  const color = getTierColor(s.tier)
+
+  document.getElementById('info').innerHTML = `
+    <h3>
+      ${s.name} (${s.cust_no})
+      <span style="
+        background:${color};
+        color:white;
+        padding:4px 8px;
+        border-radius:6px;
+        margin-left:10px;
+        font-size:12px;
+      ">
+        ${s.tier}
+      </span>
+    </h3>
+    <p>마지막 방문: ${String(s.last_mdcl_day).split('T')[0]}</p>
+  `
+
+  drawBar(data)
+  drawLine(data)
+  renderLegend()   // 여기 추가
+}
+
+function drawBar(data){
+
+  const myColor = getTierColor(data.summary.tier)
+
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: ['내 금액', '평균'],
+      datasets: [{
+        label: '수납 금액 비교',
+        data: [
+          data.summary.total_amt,
+          data.summary.avg_amt
+        ],
+        backgroundColor: [
+          myColor,                      // 🔥 등급 색상 적용
+          'rgba(54, 162, 235, 0.3)'
+        ],
+        borderRadius: 10,
+        borderWidth: 0
+      }]
+    },
+
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              return `${ctx.label}: ${ctx.raw.toLocaleString()}원`
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: function(value){
+              return value.toLocaleString() + '원'
+            }
+          }
+        }
+      }
+    }
+  })
+}
+
+function drawLine(data){
+  const labels = data.daily.map(d => String(d.mdcl_day).split('T')[0])
+  const values = data.daily.map(d => d.daily_amt)
+
+  new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: '방문 수납금액',
+        data: values,
+        borderWidth: 2,
+        tension: 0.3
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              return `금액: ${ctx.raw.toLocaleString()}원`
+            }
+          }
+        }
+      }
+    }
+  })
+}
+
+/* 등급 색상 함수 */
+function getTierColor(tier){
+  switch(tier){
+    case 'TOP 10%': return 'gold'
+    case 'TOP 20%': return '#fa8c16'
+    case 'TOP 30%': return '#52c41a'
+    case 'TOP 40%': return '#1890ff'
+    case 'TOP 50%': return '#722ed1'
+    default: return '#999'
+  }
+}
+
+/* 등급 설명 박스 */
+function renderLegend(){
+  const tiers = [
+    {name:'TOP 10%', color:'gold'},
+    {name:'TOP 20%', color:'#fa8c16'},
+    {name:'TOP 30%', color:'#52c41a'},
+    {name:'TOP 40%', color:'#1890ff'},
+    {name:'TOP 50%', color:'#722ed1'},
+    {name:'NORMAL', color:'#999'}
+  ]
+
+  const container = document.getElementById('tier-legend')
+  container.innerHTML = ''
+
+  tiers.forEach(t => {
+    const box = document.createElement('div')
+
+    box.style.display = 'flex'
+    box.style.alignItems = 'center'
+    box.style.gap = '6px'
+    box.style.padding = '6px 10px'
+    box.style.borderRadius = '8px'
+    box.style.background = '#f5f5f5'
+
+    box.innerHTML = `
+      <div style="
+        width:12px;
+        height:12px;
+        background:${t.color};
+        border-radius:3px;
+      "></div>
+      <span>${t.name}</span>
+    `
+
+    container.appendChild(box)
+  })
+}
+</script>
+
+</body>
+</html>

@@ -5,35 +5,31 @@ import joblib
 import os
 
 try:
-    # 모델 로드
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(BASE_DIR, 'model.pkl')
+    model_path = os.path.join(BASE_DIR, 'model_latest_2.pkl')
 
     saved = joblib.load(model_path)
     model = saved["model"]
     features = saved["features"]
 
-    # 전체 데이터 입력
     input_data = sys.stdin.read()
     patients = json.loads(input_data)
 
     df = pd.DataFrame(patients)
 
-    # NaN 처리
+    # 타입 변환
+    for col in features:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
     df = df.fillna(0)
 
-    # 🔥 첫 방문 환자 분리
-    df['revisit_prob'] = 0.8  # 기본값
+    # 예측
+    probs = model.predict_proba(df[features])[:, 1]
+    df['revisit_prob'] = probs
 
-    mask = df['visit_count'] > 1
-
-    if mask.sum() > 0:
-        probs = model.predict_proba(df.loc[mask, features])[:, 1]
-        df.loc[mask, 'revisit_prob'] = probs
-
-    # 결과 반환
     result = df[['CUST_NO', 'revisit_prob']].to_dict(orient='records')
 
+    # 이것만 stdout (중요)
     print(json.dumps(result))
 
 except Exception as e:

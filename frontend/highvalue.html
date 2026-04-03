@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+<meta charset="UTF-8">
+<title>고액 환자 분석</title>
+</head>
+
+<body style="
+  font-family: Arial;
+  background: linear-gradient(135deg, #f5f7fa, #e4ecf7);
+  margin: 0;
+  padding: 20px;
+">
+
+<div style="
+  max-width: 1000px;
+  margin: auto;
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+">
+
+<h2 style="
+  margin-bottom: 25px;
+  color: #333;
+  border-left: 6px solid #faad14;
+  padding-left: 12px;
+">
+💰 고액 환자 분석
+</h2>
+
+<!-- 검색 -->
+
+<div style="margin-bottom:25px;">
+  <input id="search" placeholder="이름 또는 고객번호" style="
+    padding:10px;
+    width:250px;
+    border-radius:8px;
+    border:1px solid #ccc;
+  ">
+  <button onclick="loadPatients()" style="
+    padding:10px 15px;
+    background:#1890ff;
+    color:white;
+    border:none;
+    border-radius:8px;
+    margin-left:5px;
+  ">조회</button>
+
+<button onclick="loadAll()" style="
+ padding:10px 15px;
+ background:#555;
+ color:white;
+ border:none;
+ border-radius:8px;
+ margin-left:5px;
+">전체</button>
+
+</div>
+
+<table style="
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+">
+  <thead>
+    <tr style="color:#888;">
+      <th align="left">고객번호</th>
+      <th align="left">이름</th>
+    </tr>
+  </thead>
+
+  <tbody id="table-body"></tbody>
+</table>
+
+<!-- 페이지 -->
+
+<div style="margin-top:20px; text-align:center;">
+  <button onclick="prevPage()">이전</button>
+  <span id="page-info" style="margin:0 10px;"></span>
+  <button onclick="nextPage()">다음</button>
+</div>
+
+</div>
+
+<script>
+const API_BASE = ""
+
+let currentPage = 1
+let currentSearch = ''
+let lastCount = 50
+
+function loadAll() {
+  currentSearch = ''
+  currentPage = 1
+  fetchData()
+}
+
+function loadPatients() {
+  currentSearch = document.getElementById('search').value
+  currentPage = 1
+  fetchData()
+}
+
+function fetchData() {
+  fetch(`${API_BASE}/patients?name=${currentSearch}&page=${currentPage}`)
+    .then(res => res.json())
+    .then(data => {
+      lastCount = data.length
+      render(data)
+    })
+}
+
+function render(data) {
+  const tbody = document.getElementById('table-body')
+  tbody.innerHTML = ''
+
+  data.forEach(row => {
+    const tr = document.createElement('tr')
+
+    tr.style.background = '#fff'
+    tr.style.boxShadow = '0 4px 10px rgba(0,0,0,0.05)'
+    tr.style.cursor = 'pointer'
+    tr.style.borderRadius = '10px'
+
+    tr.onclick = () => {
+      location.href = `highvalue_detail.html?cust_no=${row.CUST_NO}`
+    }
+
+    tr.innerHTML = `
+        <td style="padding:15px;">${row.CUST_NO}</td>
+        <td style="padding:15px;">${row.NAME}</td>
+        <td style="padding:15px;">
+            <button onclick="goDetail('${row.CUST_NO}')" style="
+                padding:6px 12px;
+                background:#1890ff;
+                color:white;
+                border:none;
+                border-radius:6px;
+                cursor:pointer;
+                ">분석</button>
+            </td>
+    `
+
+    tr.onmouseover = () => tr.style.transform = 'scale(1.01)'
+    tr.onmouseout = () => tr.style.transform = 'scale(1)'
+
+    tbody.appendChild(tr)
+  })
+
+  document.getElementById('page-info').innerText =
+    `페이지 ${currentPage} (${lastCount === 50 ? '다음' : '마지막'})`
+}
+
+function goDetail(custNo){
+  location.href = `highvalue_detail.html?cust_no=${custNo}`
+}
+
+function nextPage() {
+  if (lastCount === 50) {
+    currentPage++
+    fetchData()
+  }
+}
+
+function prevPage() {
+  if(currentPage > 1){
+    currentPage--
+    fetchData()
+  }
+}
+
+// 최초 실행
+fetchData()
+</script>
+
+</body>
+</html>

@@ -9,7 +9,7 @@ try:
     input_json = sys.argv[1]
     data = json.loads(input_json)
 
-    # 🔥 모델 경로 수정 (핵심)
+    # 모델 경로 수정 (핵심)
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     model_path = os.path.join(BASE_DIR, 'model.pkl')
 
@@ -34,6 +34,6 @@ try:
     }))
 
 except Exception as e:
-    # 🔥 에러 로그 출력 (Node에서 확인 가능)
+    # 에러 로그 출력 (Node에서 확인 가능)
     print(f"ERROR: {str(e)}", file=sys.stderr)
     sys.exit(1)

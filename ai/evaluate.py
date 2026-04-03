@@ -11,7 +11,7 @@ y = df['target']
 X = X.fillna(X.mean())
 
 # 모델 로드
-data = joblib.load('model.pkl')
+data = joblib.load('model_latest.pkl')
 
 model = data['model']
 scaler = data.get('scaler')

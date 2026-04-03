@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>환자 상세 분석</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body style="
+  font-family: Arial;
+  background: linear-gradient(135deg, #f5f7fa, #e4ecf7);
+  margin: 0;
+  padding: 20px;
+">
+
+<div style="
+  max-width: 900px;
+  margin: auto;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+">
+
+<h2 style="
+  margin-bottom: 20px;
+  color: #333;
+  border-left: 5px solid #1890ff;
+  padding-left: 10px;
+">
+
+<h2>환자 상세 분석</h2>
+
+<!-- 로딩 -->
+<div id="loading">
+  ⏳ 분석 중입니다... 잠시만 기다려주세요
+</div>
+
+<!-- 결과 영역 -->
+<div id="content" style="display:none;">
+  <div id="info"></div>
+
+  <canvas id="chart" height="100"></canvas>
+
+  <div id="explanation" style="
+  background:#f0f5ff;
+  padding:15px;
+  border-radius:8px;
+  border-left:5px solid #1890ff;
+  line-height:1.6;
+  white-space: pre-line;
+  margin-top:20px;
+">
+
+
+    <b>AI 분석:</b> 준비 중...
+  </div>
+
+
+
+  <h3 style="margin-top:25px;">위험도 산정 기준</h3>
+
+  <button onclick="toggleRule()" style="
+    padding:6px 12px;
+    background:#1890ff;
+    color:white;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+  ">
+    기준 보기
+  </button>
+
+  <div id="score-rule" style="
+    display:none;
+    margin-top:15px;
+    background:#fafafa;
+    padding:15px;
+    border-radius:8px;
+    border:1px solid #eee;
+    line-height:1.6;
+  ">
+    <ul style="margin:0; padding-left:20px;">
+      <li>재방문 확률 ≤ 0.3 → +3점</li>
+      <li>재방문 확률 ≤ 0.6 → +2점</li>
+      <li>재방문 확률 ≤ 0.8 → +1점</li>
+
+      <br>
+
+      <li>경과일 ≥ 평균 방문 간격의 3배 → +3점</li>
+      <li>경과일 ≥ 평균 방문 간격의 2배 → +2점</li>
+      <li>경과일 ≥ 평균 방문 간격의 1.5배 → +1점</li>
+
+      <br>
+
+      <li>경과일 ≥ 365일 → +3점</li>
+      <li>경과일 ≥ 180일 → +2점</li>
+
+      <br>
+
+      <li>방문지연여부 = 1 → +1점</li>
+
+      <br>
+
+      <li><b>총점 ≥ 6 → HIGH</b></li>
+      <li><b>총점 ≥ 3 → MID</b></li>
+      <li><b>그 외 → LOW</b></li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const API_BASE = ""
+
+// URL에서 데이터 가져오기
+const params = new URLSearchParams(window.location.search)
+const row = JSON.parse(decodeURIComponent(params.get('data')))
+
+// 로딩 연출 (1초)
+setTimeout(() => {
+  render(row)
+}, 1000)
+
+function render(row) {
+  document.getElementById('loading').style.display = 'none'
+  document.getElementById('content').style.display = 'block'
+
+  // 1. 정보 표시
+  document.getElementById('info').innerHTML = `
+  <div style="
+    background:#f7f9fc;
+    padding:15px;
+    border-radius:8px;
+    margin-bottom:15px;
+  ">
+    <p><b>이름:</b> ${row.name}</p>
+    <p><b>고객번호:</b> ${row.CUST_NO}</p>
+    <p><b>방문횟수:</b> ${row.visit_count}</p>
+    <p><b>경과일:</b> ${row.days_since_last_visit}</p>
+    <p><b>예측 확률:</b> ${(row.revisit_prob * 100).toFixed(1)}%</p>
+    <p><b>위험도:</b> ${row.risk_level}</p>
+    <p><b>위험 점수:</b> ${row.total_score || '-'}점</p>
+    </div>
+  `
+
+  // 2. 그래프
+  drawChart(row)
+
+  document.getElementById('explanation').innerHTML = '⏳ AI 분석 생성 중...'
+
+  fetch(`${API_BASE}/explain`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(row)
+  })
+  .then(res => res.json())
+  .then(data => {
+    document.getElementById('explanation').innerHTML = `
+      <b>AI 분석:</b> ${data.explanation}
+    `
+  })
+  .catch(err => {
+    console.error(err)
+    document.getElementById('explanation').innerHTML = '❌ 설명 생성 실패'
+  })
+}
+
+function toggleRule() {
+  const el = document.getElementById('score-rule')
+  el.style.display = el.style.display === 'none' ? 'block' : 'none'
+}
+
+// 그래프
+let chart
+
+function drawChart(row) {
+  const ctx = document.getElementById('chart').getContext('2d')
+
+  if (chart) chart.destroy()
+
+  chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['현재 경과일', '평균 방문 간격'],
+      datasets: [{
+        label: '일수',
+        data: [
+          row.days_since_last_visit,
+          row.avg_gap_days || 0
+        ],
+        backgroundColor : [
+        'rgba(255, 77, 79, 0.8)',   
+        'rgba(24, 144, 255, 0.8)'
+        ],
+        borderWidth: 1
+      }]
+    }
+  })
+}
+
+</script>
+</div>
+</body>
+</html>
